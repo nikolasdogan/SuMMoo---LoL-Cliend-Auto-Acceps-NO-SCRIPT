@@ -1,5 +1,30 @@
 # Summoo Bridge
 
+An open-source utility that allows you to remotely manage the **League of Legends** client (LCU) using chat commands (START, STOP, TRANSFER, BAN, ANNOUNCE), auto-accepting when a match is found and auto-picking if your preference list allows.
+
+## Features
+- Lobby & DM commands → real LCU operations
+- Auto-accept (accept as soon as the window opens)
+- Preferential auto-pick (e.g., shaco, teemo, trundle)
+- Lightweight, single Python process
+
+## Installation
+1) Python 3.10+
+2) `pip install -r requirements.txt`
+3) Run with League Client open: `python main.py`
+
+### Environment variables
+- `AUTO_READY=true|false` (default: true)
+- `LOG_LEVEL=INFO|DEBUG`
+
+## Responsible use
+This project is for educational/automation purposes. Do not use it for cheating, harassment, or EULA/ToS violations.
+All risks are at the user's expense; check Riot's terms.
+
+###################################################################################################################################
+
+# Summoo Bridge
+
 Sohbetten gelen komutlarla (BASLAT, DURDUR, DEVRET, BAN, ANONS) **League of Legends** istemcisini (LCU) uzaktan yönetmenizi, maç bulununca **auto-accept**, tercih listeniz uygunsa **auto-pick** yapmanızı sağlayan açık kaynak bir yardımcı.
 
 ## Özellikler
