@@ -4,9 +4,9 @@ from lcu_session import LcuSession
 from chat_service import ChatService
 from telegram_bridge import TelegramBridge
 
-BOT = os.getenv("TELEGRAM_BOT_TOKEN", "8350941328:AAHd9L2pGXoF3elFvqys2LxQG0Rf6-v3d9U")
-OWNER = int(os.getenv("TELEGRAM_OWNER_ID", "6508644621") or 0)
-FORUM = os.getenv("TELEGRAM_FORUM_ID", "-1002797965205")  # opsiyonel
+BOT = os.getenv("TELEGRAM_BOT_TOKEN", "TOKEN")
+OWNER = int(os.getenv("TELEGRAM_OWNER_ID", "OWNER_ID") or 0)
+FORUM = os.getenv("TELEGRAM_FORUM_ID", "-CHAR_ID")  # opsiyonel
 
 if not BOT or not OWNER:
     raise SystemExit("TELEGRAM_BOT_TOKEN ve TELEGRAM_OWNER_ID gerekli.")
@@ -27,3 +27,4 @@ try:
         time.sleep(60)
 except KeyboardInterrupt:
     pass
+
