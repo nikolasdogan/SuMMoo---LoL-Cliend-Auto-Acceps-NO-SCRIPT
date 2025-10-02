@@ -1,5 +1,5 @@
 ## Downloads
-<img width="679" height="266" alt="download_image" src="https://github.com/user-attachments/assets/90da2796-f589-4e30-ada1-73b3507791c5" />
+<img width="25%" height="25%" alt="download_image" src="https://github.com/user-attachments/assets/90da2796-f589-4e30-ada1-73b3507791c5" />
 
 | Architecture    | Windows |
 |-----------------|---------|
