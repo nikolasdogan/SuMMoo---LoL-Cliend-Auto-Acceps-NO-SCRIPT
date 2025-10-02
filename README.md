@@ -1,3 +1,11 @@
+## Downloads
+
+| Architecture    | Windows |
+|-----------------|---------|
+| x86-64 (64-bit) | [EXE]  |
+
+[EXE]: https://github.com/nikolasdogan/SuMMoo---LoL-Cliend-Auto-Acceps-NO-SCRIPT/releases/download/v0.0.1/LoLAutoPilot.exe
+
 # Summoo Bridge
 
 An open-source utility that allows you to remotely manage the **League of Legends** client (LCU) using chat commands (START, STOP, TRANSFER, BAN, ANNOUNCE), auto-accepting when a match is found and auto-picking if your preference list allows.
