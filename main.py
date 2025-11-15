@@ -1,6 +1,6 @@
 from __future__ import annotations
 import sys, threading, time, os
-from typing import Optional
+from typing import Optional, Callable
 from utils import log_once, ASCII_LOGO
 from lcu_session import LcuSession
 from chat_service import ChatService
@@ -48,6 +48,86 @@ def emergency_hotkey(stop_flag: dict):
     with keyboard.Listener(on_press=on_press, on_release=on_release) as L:
         L.join()
 
+# ------------ Paylaşılan lobi / DM komutları ------------
+def handle_party_management_command(
+    cs: ChatService,
+    txt: str,
+    from_name: str,
+    send_feedback: Callable[[str], None],
+) -> bool:
+    text = (txt or "").strip()
+    if not text:
+        return False
+    low = text.lower()
+
+    def reply(msg: str):
+        if send_feedback and msg:
+            send_feedback(msg)
+
+    # BASLAT / START
+    if low in ("baslat", "start", "/l"):
+        log_once("GRP-CMD", f"{from_name} → BASLAT")
+        if cs.is_party_leader():
+            reply("Matchmaking başlatılıyor…")
+            ok = cs.start_matchmaking()
+            log_once("QUEUE", f"START_CALL={'OK' if ok else 'FAIL'}")
+        else:
+            reply(f"{from_name} başlat dedi ama lider değilim.")
+        return True
+
+    # BAN <isim>
+    if low.startswith("ban "):
+        target = text.split(" ", 1)[1].strip()
+        log_once("GRP-CMD", f"{from_name} → BAN \"{target}\"")
+        if not cs.is_party_leader():
+            reply(f"{from_name} ban istedi ama lider değilim.")
+            return True
+        m = cs.find_member_by_name(target)
+        if not m:
+            reply(f'Kullanıcı bulunamadı: "{target}"')
+            return True
+        ok = cs.kick_member_by_id(m.get("summonerId"))
+        reply(
+            f'{m.get("summonerName")} lobiden atıldı.' if ok else "Ban başarısız."
+        )
+        return True
+
+    # ODADEVRET [isim]
+    if low.startswith("odadevret"):
+        parts = text.split(" ", 1)
+        target = parts[1].strip() if len(parts) == 2 else (from_name or "")
+        log_once("GRP-CMD", f"{from_name} → ODADEVRET \"{target}\"")
+        if not cs.is_party_leader():
+            reply(f"{from_name} devir istedi ama lider değilim.")
+            return True
+        if not target:
+            reply("ODADEVRET için hedef yok.")
+            return True
+        m = cs.find_member_by_name(target)
+        if not m:
+            reply(f'Liderlik devri için kullanıcı yok: "{target}"')
+            return True
+        ok = cs.promote_member_by_id(m.get("summonerId"))
+        reply(
+            f'Liderlik {m.get("summonerName")} kullanıcısına devredildi.'
+            if ok
+            else "Devir başarısız."
+        )
+        return True
+
+    return False
+
+
+def handle_dm_party_command(cs: ChatService, friend_key: str, friend_name: str, body: str) -> bool:
+    name = friend_name or friend_key or "?"
+
+    def dm_feedback(msg: str):
+        if msg:
+            cs.dm_send(friend_key, msg)
+
+    return handle_party_management_command(cs, body, name, dm_feedback)
+
+
 # ------------ Grup komutları (Lobby sohbeti) ------------
 def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: str, cfg: dict):
     txt = (body or "").strip()
@@ -57,15 +137,7 @@ def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: st
         if not cfg.get("silent_group", False):
             cs.send(conv_id, msg)
 
-    # BASLAT / START
-    if low in ("baslat","start","/l"):
-        log_once("GRP-CMD", f'{from_name} → BASLAT')
-        if cs.is_party_leader():
-            info_to_group("Matchmaking başlatılıyor…")
-            ok = cs.start_matchmaking()
-            log_once("QUEUE", f"START_CALL={'OK' if ok else 'FAIL'}")
-        else:
-            info_to_group(f"{from_name} başlat dedi ama lider değilim.")
+    if handle_party_management_command(cs, txt, from_name, info_to_group):
         return
 
     # DURDUR / STOP
@@ -84,34 +156,6 @@ def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: st
         info = cs.geoinfo_quick()
         log_once("GRP-CMD", f'{from_name} → GEO')
         info_to_group(f"GeoInfo: {info}")
-        return
-
-    # BAN <isim>
-    if low.startswith("ban "):
-        target = txt.split(" ", 1)[1].strip()
-        log_once("GRP-CMD", f'{from_name} → BAN \"{target}\"')
-        if not cs.is_party_leader():
-            info_to_group(f"{from_name} ban istedi ama lider değilim."); return
-        m = cs.find_member_by_name(target)
-        if not m: info_to_group(f'Kullanıcı bulunamadı: \"{target}\"'); return
-        ok = cs.kick_member_by_id(m.get("summonerId"))
-        info_to_group(f'{m.get("summonerName")} lobiden atıldı.' if ok else "Ban başarısız.")
-        return
-
-    # ODADEVRET [isim]
-    if low.startswith("odadevret"):
-        parts = txt.split(" ",1)
-        target = parts[1].strip() if len(parts)==2 else (from_name or "")
-        log_once("GRP-CMD", f'{from_name} → ODADEVRET \"{target}\"')
-        if not cs.is_party_leader():
-            info_to_group(f"{from_name} devir istedi ama lider değilim."); return
-        if not target:
-            info_to_group("ODADEVRET için hedef yok."); return
-        m = cs.find_member_by_name(target)
-        if not m:
-            info_to_group(f'Liderlik devri için kullanıcı yok: \"{target}\"'); return
-        ok = cs.promote_member_by_id(m.get("summonerId"))
-        info_to_group(f'Liderlik {m.get("summonerName")} kullanıcısına devredildi.' if ok else "Devir başarısız.")
         return
 
         # --- AUTO-PICK (sadece lobi sohbetinden kontrol) ---
@@ -342,18 +386,40 @@ def main():
         f"auto_pick_list={cfg['auto_pick_list']} ids={cfg['auto_pick_ids']}"
     )
 
+    dm_callbacks = []
+
+    def _dm_command_callback(friend_key: str, friend_name: str, body: str, is_me: bool):
+        if is_me:
+            return
+        if handle_dm_party_command(cs, friend_key, friend_name, body):
+            who = friend_name or friend_key
+            log_once("DM-CMD", f"{who} → {body}")
+
+    dm_callbacks.append(_dm_command_callback)
+
     # Telegram köprü (varsa)
     BOT = os.getenv("TELEGRAM_BOT_TOKEN", "")
     OWNER = int(os.getenv("TELEGRAM_OWNER_ID", "0") or 0)
     FORUM = os.getenv("TELEGRAM_FORUM_ID", "")  # -100... forum
+    tb: Optional[TelegramBridge] = None
     if BOT and OWNER:
         tb = TelegramBridge(cs, owner_id=OWNER, bot_token=BOT,
                             forum_chat_id=(int(FORUM) if FORUM else None))
         tb.start_in_thread()
-        threading.Thread(target=cs.watch_dms, args=(tb.on_dm_from_lol,), daemon=True).start()
+        dm_callbacks.append(tb.on_dm_from_lol)
         log_once("TG", "Telegram bridge aktif (main üzerinden).")
     else:
         log_once("TG", "Pasif: TELEGRAM_BOT_TOKEN / TELEGRAM_OWNER_ID set değil.")
+
+    def _dm_dispatcher(friend_key: str, friend_name: str, body: str, is_me: bool):
+        for cb in dm_callbacks:
+            try:
+                cb(friend_key, friend_name, body, is_me)
+            except Exception as e:
+                log_once("DM-CB", f"err={e}")
+
+    threading.Thread(target=cs.watch_dms, args=(_dm_dispatcher,), daemon=True).start()
+    log_once("DM", "DM watcher aktif.")
 
     # Lobby grup mesajlarını izle → komutları işle
     threading.Thread(
