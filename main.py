@@ -4,9 +4,20 @@ from typing import Optional
 from utils import log_once, ASCII_LOGO
 from lcu_session import LcuSession
 from chat_service import ChatService
-from ui_clicker import clicker_worker, state as CLICK_STATE
 from pynput import keyboard
 from telegram_bridge import TelegramBridge
+
+IS_WINDOWS = os.name == "nt"
+CLICKER_AVAILABLE = IS_WINDOWS
+
+if IS_WINDOWS:
+    from ui_clicker import clicker_worker, state as CLICK_STATE
+else:
+    CLICK_STATE = {"active": False}
+
+    def clicker_worker():
+        """No-op clicker for non-Windows platforms."""
+        log_once("CLICK", "UI clicker devre dışı (yalnızca Windows).")
 
 # ------------ Yardım ------------
 def _print_help():
@@ -167,9 +178,8 @@ def ready_check_watcher(cs: ChatService, cfg: dict, stop_flag: dict):
     last_attempt_ts = 0.0
     fail_streak = 0
 
-    fallback_click = cfg.get("fallback_click", False)
+    fallback_click = cfg.get("fallback_click", False) and CLICKER_AVAILABLE
     click_burst_sec = 6.0
-    from ui_clicker import state as CLICK_STATE
 
     while not stop_flag.get("stop"):
         try:
@@ -319,6 +329,10 @@ def main():
         cfg["auto_pick_ids"] = ids
     _hydrate_pick_ids()
 
+    if cfg["fallback_click"] and not CLICKER_AVAILABLE:
+        log_once("READY", "AUTO_READY_FALLBACK_CLICK sadece Windows'ta desteklenir; devre dışı bırakıldı.")
+        cfg["fallback_click"] = False
+
     log_once("CFG",
         f"announce={cfg['announce']} silent_group={cfg['silent_group']} "
         f"quiet={cfg['quiet']} auto_ready={cfg['auto_ready']} "
@@ -369,7 +383,10 @@ def main():
 
     # Ekran tıklayıcı (şimdilik pasif)
     CLICK_STATE["active"] = False
-    threading.Thread(target=clicker_worker, daemon=True).start()
+    if CLICKER_AVAILABLE:
+        threading.Thread(target=clicker_worker, daemon=True).start()
+    else:
+        log_once("CLICK", "UI clicker thread'i başlatılmadı (Windows dışı platform).")
 
     # Acil durdurma hotkey
     threading.Thread(target=emergency_hotkey, args=(stop_flag,), daemon=True).start()
