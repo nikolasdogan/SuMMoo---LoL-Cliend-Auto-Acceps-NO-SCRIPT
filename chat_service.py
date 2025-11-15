@@ -378,6 +378,12 @@ class ChatService:
             if (m.get("summonerName") or "")
         }
 
+    def is_in_lobby(self, summoner_name: str | None) -> bool:
+        """Return True if the given summoner currently sits in our lobby."""
+        if not summoner_name:
+            return False
+        return summoner_name.strip().lower() in self._lobby_member_names()
+
     def get_lobby_group_id(self) -> Optional[str]:
         """
         Lobby üyeleri ile mevcut grup sohbetlerinin katılımcılarını kesiştirir,

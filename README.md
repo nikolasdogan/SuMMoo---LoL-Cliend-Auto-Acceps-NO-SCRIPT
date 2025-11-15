@@ -24,6 +24,8 @@ An open-source utility that allows you to remotely manage the **League of Legend
 2) `pip install -r requirements.txt`
 3) Run with League Client open: `python main.py`
 
+> **Note:** The optional UI clicker (auto-accept fallback) relies on Windows-only APIs via `pyautogui` and `pygetwindow`. On Linux/macOS these packages are skipped and the feature is automatically disabled.
+
 ### Environment variables
 - `AUTO_READY=true|false` (default: true)
 - `LOG_LEVEL=INFO|DEBUG`
@@ -44,9 +46,11 @@ Sohbetten gelen komutlarla (BASLAT, DURDUR, DEVRET, BAN, ANONS) **League of Lege
 - Hafif, tek Python süreci
 
 ## Kurulum
-1) Python 3.10+  
-2) `pip install -r requirements.txt`  
+1) Python 3.10+
+2) `pip install -r requirements.txt`
 3) League Client açıkken çalıştır: `python main.py`
+
+> **Not:** Opsiyonel UI tıklayıcı (auto-accept fallback) `pyautogui` ve `pygetwindow` ile Windows API’lerini kullanır. Linux/macOS ortamlarında bu paketler kurulmaz ve özellik otomatik olarak devre dışı kalır.
 
 ### Ortam değişkenleri
 - `AUTO_READY=true|false` (varsayılan: true)

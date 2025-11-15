@@ -4,9 +4,20 @@ from typing import Optional
 from utils import log_once, ASCII_LOGO
 from lcu_session import LcuSession
 from chat_service import ChatService
-from ui_clicker import clicker_worker, state as CLICK_STATE
 from pynput import keyboard
 from telegram_bridge import TelegramBridge
+
+IS_WINDOWS = os.name == "nt"
+CLICKER_AVAILABLE = IS_WINDOWS
+
+if IS_WINDOWS:
+    from ui_clicker import clicker_worker, state as CLICK_STATE
+else:
+    CLICK_STATE = {"active": False}
+
+    def clicker_worker():
+        """No-op clicker for non-Windows platforms."""
+        log_once("CLICK", "UI clicker devre dışı (yalnızca Windows).")
 
 # ------------ Yardım ------------
 def _print_help():
@@ -46,8 +57,19 @@ def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: st
         if not cfg.get("silent_group", False):
             cs.send(conv_id, msg)
 
+    def require_lobby_member(action: str) -> bool:
+        if cs.is_in_lobby(from_name):
+            return True
+        actor = from_name or "(bilinmeyen)"
+        warning = f"{actor} lobide olmadığı için {action} komutu yok sayıldı."
+        log_once("GRP-CMD", warning)
+        info_to_group(warning)
+        return False
+
     # BASLAT / START
     if low in ("baslat","start","/l"):
+        if not require_lobby_member("başlatma"):
+            return
         log_once("GRP-CMD", f'{from_name} → BASLAT')
         if cs.is_party_leader():
             info_to_group("Matchmaking başlatılıyor…")
@@ -59,6 +81,8 @@ def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: st
 
     # DURDUR / STOP
     if low in ("durdur","stop"):
+        if not require_lobby_member("durdurma"):
+            return
         log_once("GRP-CMD", f'{from_name} → DURDUR')
         if cs.is_party_leader():
             ok = cs.stop_matchmaking()
@@ -77,6 +101,8 @@ def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: st
 
     # BAN <isim>
     if low.startswith("ban "):
+        if not require_lobby_member("ban"):
+            return
         target = txt.split(" ", 1)[1].strip()
         log_once("GRP-CMD", f'{from_name} → BAN \"{target}\"')
         if not cs.is_party_leader():
@@ -89,6 +115,8 @@ def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: st
 
     # ODADEVRET [isim]
     if low.startswith("odadevret"):
+        if not require_lobby_member("oda devretme"):
+            return
         parts = txt.split(" ",1)
         target = parts[1].strip() if len(parts)==2 else (from_name or "")
         log_once("GRP-CMD", f'{from_name} → ODADEVRET \"{target}\"')
@@ -167,9 +195,8 @@ def ready_check_watcher(cs: ChatService, cfg: dict, stop_flag: dict):
     last_attempt_ts = 0.0
     fail_streak = 0
 
-    fallback_click = cfg.get("fallback_click", False)
+    fallback_click = cfg.get("fallback_click", False) and CLICKER_AVAILABLE
     click_burst_sec = 6.0
-    from ui_clicker import state as CLICK_STATE
 
     while not stop_flag.get("stop"):
         try:
@@ -319,6 +346,10 @@ def main():
         cfg["auto_pick_ids"] = ids
     _hydrate_pick_ids()
 
+    if cfg["fallback_click"] and not CLICKER_AVAILABLE:
+        log_once("READY", "AUTO_READY_FALLBACK_CLICK sadece Windows'ta desteklenir; devre dışı bırakıldı.")
+        cfg["fallback_click"] = False
+
     log_once("CFG",
         f"announce={cfg['announce']} silent_group={cfg['silent_group']} "
         f"quiet={cfg['quiet']} auto_ready={cfg['auto_ready']} "
@@ -369,7 +400,10 @@ def main():
 
     # Ekran tıklayıcı (şimdilik pasif)
     CLICK_STATE["active"] = False
-    threading.Thread(target=clicker_worker, daemon=True).start()
+    if CLICKER_AVAILABLE:
+        threading.Thread(target=clicker_worker, daemon=True).start()
+    else:
+        log_once("CLICK", "UI clicker thread'i başlatılmadı (Windows dışı platform).")
 
     # Acil durdurma hotkey
     threading.Thread(target=emergency_hotkey, args=(stop_flag,), daemon=True).start()
