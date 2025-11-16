@@ -20,8 +20,11 @@ class TelegramBridge:
         self.topic_to_friend: Dict[int, str] = {}
         self._rebuild_reverse_index()
         self._start_callbacks: Dict[str, Callable[[bool], None]] = {}
-        self._owner_confirmed = False
-        self._ready = threading.Event()
+        # Keep public attribute names (`owner_confirmed`, `ready`) to match
+        # upstream expectations and avoid merge conflicts, but also expose
+        # private aliases via properties for internal helpers.
+        self.owner_confirmed = False
+        self.ready = threading.Event()
 
     def _rebuild_reverse_index(self):
         topics = getattr(self, "topics", {}) or {}
@@ -44,11 +47,11 @@ class TelegramBridge:
 
     def _build(self):
         async def _mark_ready(app):
-            self._ready.set()
+            self.ready.set()
             log_once("TG", "Telegram bridge hazır (polling başladı)")
 
         async def _clear_ready(app):
-            self._ready.clear()
+            self.ready.clear()
             log_once("TG", "Telegram bridge durduruldu")
 
         self.app = (
@@ -72,21 +75,21 @@ class TelegramBridge:
             self._build()
             log_once("TG", f"loop ready: {id(loop)}")
             self.app.run_polling(allowed_updates=Update.ALL_TYPES)
-        self._ready.clear()
+        self.ready.clear()
         threading.Thread(target=_runner, daemon=True).start()
         log_once("TG", "Telegram bridge thread started")
 
     def wait_until_ready(self, timeout: float = 5.0) -> bool:
         """Harici çağrıların döngü hazır olana kadar beklemesine izin verir."""
 
-        return self._ready.wait(timeout)
+        return self.ready.wait(timeout)
 
     async def _only_owner(self, update: Update) -> bool:
         if update.effective_user and update.effective_user.id == self.owner_id:
-            if not self._owner_confirmed:
+            if not self.owner_confirmed:
                 username = update.effective_user.username or "?"
                 log_once("TG", f"Owner doğrulandı: {update.effective_user.id} (@{username})")
-                self._owner_confirmed = True
+                self.owner_confirmed = True
             return True
         try:
             await update.effective_message.reply_text("Yetkin yok.")
