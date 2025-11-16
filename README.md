@@ -17,6 +17,7 @@ An open-source utility that allows you to remotely manage the **League of Legend
 - Lobby & DM commands → real LCU operations
 - Auto-accept (accept as soon as the window opens)
 - Preferential auto-pick (e.g., shaco, teemo, trundle)
+- Telegram push + inline approval when you're marked Busy/Away and someone types **BASLAT** in lobby
 - Lightweight, single Python process
 
 ## Installation
@@ -43,6 +44,7 @@ Sohbetten gelen komutlarla (BASLAT, DURDUR, DEVRET, BAN, ANONS) **League of Lege
 - Lobby & DM komutları → gerçek LCU işlemleri
 - Auto-accept (pencere açılır açılmaz kabul)
 - Tercihli auto-pick (örn. shaco, teemo, trundle)
+- Durumun Meşgul/Uzaktayken lobide biri **BASLAT** yazarsa Telegram'dan onay isteği gönderir
 - Hafif, tek Python süreci
 
 ## Kurulum
