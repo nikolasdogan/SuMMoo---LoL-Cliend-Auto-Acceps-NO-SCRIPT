@@ -248,6 +248,16 @@ class ChatService:
         j = self._lget("/lol-lobby/v2/lobby")
         return j.get("members", []) or []
 
+    def is_puuid_in_lobby(self, puuid: str | None) -> bool:
+        target = (puuid or "").lower().strip()
+        if not target:
+            return False
+        for member in self._lobby_members():
+            mp = (member.get("puuid") or "").lower().strip()
+            if mp and mp == target:
+                return True
+        return False
+
     def find_member_by_name(self, name: str) -> Optional[dict]:
         n = (name or "").strip().lower()
         for m in self._lobby_members():

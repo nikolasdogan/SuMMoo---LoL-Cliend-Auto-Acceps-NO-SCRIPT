@@ -54,6 +54,9 @@ def handle_party_management_command(
     txt: str,
     from_name: str,
     send_feedback: Callable[[str], None],
+    *,
+    context: str = "group",
+    sender_puuid: Optional[str] = None,
 ) -> bool:
     text = (txt or "").strip()
     if not text:
@@ -67,6 +70,9 @@ def handle_party_management_command(
     # BASLAT / START
     if low in ("baslat", "start", "/l"):
         log_once("GRP-CMD", f"{from_name} → BASLAT")
+        if context == "dm" and not cs.is_puuid_in_lobby(sender_puuid):
+            reply("lobbye katilmadiginiz icin oyun baslatma yetkini bulunmamaktadir")
+            return True
         if cs.is_party_leader():
             reply("Matchmaking başlatılıyor…")
             ok = cs.start_matchmaking()
@@ -125,7 +131,14 @@ def handle_dm_party_command(cs: ChatService, friend_key: str, friend_name: str, 
         if msg:
             cs.dm_send(friend_key, msg)
 
-    return handle_party_management_command(cs, body, name, dm_feedback)
+    return handle_party_management_command(
+        cs,
+        body,
+        name,
+        dm_feedback,
+        context="dm",
+        sender_puuid=friend_key,
+    )
 
 
 # ------------ Grup komutları (Lobby sohbeti) ------------
