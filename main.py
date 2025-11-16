@@ -68,6 +68,8 @@ def handle_party_management_command(
     *,
     context: str = "group",
     sender_puuid: Optional[str] = None,
+    conv_id: Optional[str] = None,
+    start_request_handler: Optional[Callable[[Optional[str], str, Callable[[str], None]], bool]] = None,
 ) -> bool:
     text = (txt or "").strip()
     if not text:
@@ -85,6 +87,8 @@ def handle_party_management_command(
             reply("lobbye katilmadiginiz icin oyun baslatma yetkini bulunmamaktadir")
             return True
         if cs.is_party_leader():
+            if start_request_handler and start_request_handler(conv_id, from_name, reply):
+                return True
             reply("Matchmaking başlatılıyor…")
             ok = cs.start_matchmaking()
             log_once("QUEUE", f"START_CALL={'OK' if ok else 'FAIL'}")
@@ -149,11 +153,14 @@ def handle_dm_party_command(cs: ChatService, friend_key: str, friend_name: str, 
         dm_feedback,
         context="dm",
         sender_puuid=friend_key,
+        conv_id=None,
+        start_request_handler=None,
     )
 
 
 # ------------ Grup komutları (Lobby sohbeti) ------------
-def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: str, cfg: dict):
+def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: str, cfg: dict,
+                         start_request_handler: Optional[Callable[[Optional[str], str, Callable[[str], None]], bool]] = None):
     txt = (body or "").strip()
     low = txt.lower()
 
@@ -161,7 +168,14 @@ def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: st
         if not cfg.get("silent_group", False):
             cs.send(conv_id, msg)
 
-    if handle_party_management_command(cs, txt, from_name, info_to_group):
+    if handle_party_management_command(
+        cs,
+        txt,
+        from_name,
+        info_to_group,
+        conv_id=conv_id,
+        start_request_handler=start_request_handler,
+    ):
         return
 
     # DURDUR / STOP
@@ -230,6 +244,92 @@ def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: st
         log_once("PICK", "auto-pick-lock = OFF")
         info_to_group("Auto-pick lock: OFF (sadece hover)")
         return
+
+
+class StartApprovalManager:
+    BUSY_STATES = {"away", "idle", "busy", "dnd", "mobile"}
+
+    def __init__(self, cs: ChatService, cfg: dict, telegram_bridge: Optional[TelegramBridge]):
+        import threading as _threading
+
+        self.cs = cs
+        self.cfg = cfg
+        self.tb = telegram_bridge
+        self._pending: dict[str, dict] = {}
+        self._seq = 0
+        self._lock = _threading.Lock()
+
+    def _next_id(self) -> str:
+        import time as _time
+
+        with self._lock:
+            self._seq += 1
+            return f"sreq-{int(_time.time()*1000):x}-{self._seq}"
+
+    def _group_notify(self, conv_id: Optional[str], text: str) -> None:
+        if not conv_id or self.cfg.get("silent_group", False):
+            return
+        self.cs.send(conv_id, text)
+
+    def _finalize(self, req_id: str, approved: bool) -> None:
+        with self._lock:
+            info = self._pending.pop(req_id, None)
+        if not info:
+            return
+
+        conv_id = info.get("conv_id")
+        requester = info.get("requester") or "bir oyuncu"
+
+        if approved:
+            ok = self.cs.start_matchmaking()
+            msg = (
+                f"{requester} isteği onaylandı, matchmaking başlatılıyor." if ok
+                else f"{requester} isteği onaylandı ancak matchmaking başlatılamadı."
+            )
+        else:
+            msg = f"{requester} tarafından istenen BASLAT reddedildi."
+
+        self._group_notify(conv_id, msg)
+
+    def maybe_request(
+        self,
+        conv_id: Optional[str],
+        requester: str,
+        reply_fn: Optional[Callable[[str], None]] = None,
+    ) -> bool:
+        if not (self.tb and conv_id):
+            return False
+
+        availability = self.cs.my_availability()
+        if availability not in self.BUSY_STATES:
+            return False
+
+        req_id = self._next_id()
+        with self._lock:
+            self._pending[req_id] = {"conv_id": conv_id, "requester": requester or ""}
+
+        if reply_fn:
+            reply_fn("Meşgul durumdayım, Telegram onayı bekleniyor…")
+        else:
+            self._group_notify(conv_id, "Meşgul durumdayım, Telegram onayı bekleniyor…")
+
+        ok = self.tb.request_start_confirmation(
+            req_id,
+            requester=requester,
+            availability=availability,
+            callback=lambda approved: self._finalize(req_id, approved),
+        )
+
+        if not ok:
+            with self._lock:
+                self._pending.pop(req_id, None)
+            if reply_fn:
+                reply_fn("Telegram onay isteği gönderilemedi; normal şekilde başlatılıyor…")
+            else:
+                self._group_notify(conv_id, "Telegram onay isteği gönderilemedi.")
+            return False
+
+        return True
 
 # ------------ Ready-Check watcher (auto-accept) ------------
 def ready_check_watcher(cs: ChatService, cfg: dict, stop_flag: dict):
@@ -435,6 +535,8 @@ def main():
     else:
         log_once("TG", "Pasif: TELEGRAM_BOT_TOKEN / TELEGRAM_OWNER_ID set değil.")
 
+    start_manager = StartApprovalManager(cs, cfg, tb) if tb else None
+
     def _dm_dispatcher(friend_key: str, friend_name: str, body: str, is_me: bool):
         for cb in dm_callbacks:
             try:
@@ -449,7 +551,14 @@ def main():
     # Lobby grup mesajlarını izle → komutları işle
     threading.Thread(
         target=lambda: cs.watch_group_messages(
-            lambda cid, body, frm: handle_group_command(cs, cid, body, frm, cfg),
+            lambda cid, body, frm: handle_group_command(
+                cs,
+                cid,
+                body,
+                frm,
+                cfg,
+                start_request_handler=(start_manager.maybe_request if start_manager else None),
+            ),
             0.8,  # interval
             True,  # include_self → SOLO desteği
             True  # debug → her mesajı GRP-SEE olarak yaz
