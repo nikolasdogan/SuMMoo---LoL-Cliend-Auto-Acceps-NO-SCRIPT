@@ -421,13 +421,6 @@ def main():
     threading.Thread(target=cs.watch_dms, args=(_dm_dispatcher,), daemon=True).start()
     log_once("DM", "DM watcher aktif.")
 
-    # Lobby grup mesajlarını izle → komutları işle
-    threading.Thread(
-        target=cs.watch_group_messages,
-        args=(lambda cid, body, frm: handle_group_command(cs, cid, body, frm, cfg), 1.5),
-        daemon=True
-    ).start()
-
     # Lobby & queue watcher (ID/solo/phase/readycheck logları)
     # Lobby grup mesajlarını izle → komutları işle
     threading.Thread(
