@@ -23,7 +23,15 @@ class TelegramBridge:
 
     def _rebuild_reverse_index(self):
         topics = getattr(self, "topics", {}) or {}
-        self.topic_to_friend = {tid: fk for fk, tid in topics.items() if isinstance(tid, int)}
+        rev = {}
+        for fk, tid in topics.items():
+            # tid may be stored as int or string in JSON; try to coerce to int
+            try:
+                tid_int = int(tid)
+            except Exception:
+                continue
+            rev[tid_int] = fk
+        self.topic_to_friend = rev
 
     def _load_topics(self) -> Dict[str, int]:
         try:
@@ -58,6 +66,10 @@ class TelegramBridge:
             self.app.run_polling(allowed_updates=Update.ALL_TYPES)
         threading.Thread(target=_runner, daemon=True).start()
         log_once("TG", "Telegram bridge thread started")
+
+    # Upstream callers (örn. main_telegram.py) hâlâ .start() bekliyor olabilir.
+    def start(self):
+        self.start_in_thread()
 
     async def _only_owner(self, update: Update) -> bool:
         if update.effective_user and update.effective_user.id == self.owner_id:
@@ -165,7 +177,7 @@ class TelegramBridge:
         if not await self._only_owner(update): return
         text = update.message.text
         chat = update.effective_chat
-        thread_id = update.effective_message.message_thread_id
+        thread_id = getattr(update.effective_message, "message_thread_id", None)
 
         if self.forum_chat_id and chat and chat.id == self.forum_chat_id and thread_id:
             fk = self.topic_to_friend.get(thread_id)
