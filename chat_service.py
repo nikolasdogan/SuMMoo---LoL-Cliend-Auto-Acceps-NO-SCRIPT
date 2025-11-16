@@ -65,6 +65,17 @@ class ChatService:
             return []
         return r.json() or []
 
+    def my_presence(self) -> Dict:
+        """Aktif hesabın sohbet / presence bilgilerini döner."""
+        r = self._get("/lol-chat/v1/me")
+        if r and r.status_code == 200:
+            return r.json() or {}
+        return {}
+
+    def my_availability(self) -> str:
+        pres = self.my_presence() or {}
+        return (pres.get('availability') or pres.get('availabilityStatus') or '').lower()
+
     def list_friends_online(self) -> List[dict]:
         out = []
         for f in self.list_friends():
