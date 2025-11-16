@@ -142,9 +142,20 @@ class ChatService:
         )
 
     # ---- DM watcher (polling) ----
-    def watch_dms(self, callback: Callable[[str, str, str, bool], None], interval: float = 2.0):
-        """callback(friend_key, friend_name, body, is_me)"""
+    def watch_dms(
+        self,
+        callback: Callable[[str, str, str, bool], None],
+        interval: float = 2.0,
+        recent_seconds: float = 120.0,
+    ):
+        """callback(friend_key, friend_name, body, is_me)
+
+        recent_seconds>0 ise, yalnızca bu süre içerisindeki mesajları tetikler.
+        """
+        import time as _t
+
         while True:
+            recent_cutoff = (_t.time() - recent_seconds) if recent_seconds and recent_seconds > 0 else None
             try:
                 for c in self.list_dms():
                     cid = c.get('id')
@@ -152,8 +163,12 @@ class ChatService:
                         continue
                     msgs = self.messages(cid, limit=30)
                     last = self._last_dm_ts.get(cid, 0.0)
+                    if recent_cutoff and last < recent_cutoff:
+                        last = recent_cutoff
                     for m in msgs:
                         ts = parse_ts_iso(m.get('timestamp'))
+                        if recent_cutoff and ts < recent_cutoff:
+                            continue
                         if ts <= last:
                             continue
                         is_me = self._is_me(m)
@@ -167,7 +182,6 @@ class ChatService:
             except Exception as e:
                 log_once("DM-WATCH", f"EXC {e}")
             finally:
-                import time as _t
                 _t.sleep(interval)
 
     # ---- DM helpers for CLI (/dm-log) ----
