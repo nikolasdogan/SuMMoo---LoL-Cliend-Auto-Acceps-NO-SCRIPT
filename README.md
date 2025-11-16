@@ -17,6 +17,7 @@ An open-source utility that allows you to remotely manage the **League of Legend
 - Lobby & DM commands → real LCU operations
 - Auto-accept (accept as soon as the window opens)
 - Preferential auto-pick (e.g., shaco, teemo, trundle)
+- Telegram push + inline approval when you're marked Busy/Away and someone types **BASLAT** in lobby
 - Lightweight, single Python process
 
 ## Installation
@@ -29,6 +30,15 @@ An open-source utility that allows you to remotely manage the **League of Legend
 ### Environment variables
 - `AUTO_READY=true|false` (default: true)
 - `LOG_LEVEL=INFO|DEBUG`
+- `TELEGRAM_BOT_TOKEN=<token>` (optional, required for Telegram bridge)
+- `TELEGRAM_OWNER_ID=<chat_id>` (Telegram user ID to receive requests; DM @userinfobot to learn yours)
+- `TELEGRAM_FORUM_ID=<threaded_chat_id>` (optional forum/channel thread relay)
+
+#### Testing the Telegram bridge
+1. Export the bot token & owner ID: `set TELEGRAM_BOT_TOKEN=123...` / `set TELEGRAM_OWNER_ID=456...`
+2. Run `python telegram_self_test.py --requester MyFriend` to push a fake BASLAT request without launching League.
+3. Approve/deny the inline buttons in Telegram; the terminal will print the captured decision.
+4. When you DM `/start` to your bot the console shows `Owner doğrulandı: <id>` proving the owner ID was picked up.
 
 ## Responsible use
 This project is for educational/automation purposes. Do not use it for cheating, harassment, or EULA/ToS violations.
@@ -43,6 +53,7 @@ Sohbetten gelen komutlarla (BASLAT, DURDUR, DEVRET, BAN, ANONS) **League of Lege
 - Lobby & DM komutları → gerçek LCU işlemleri
 - Auto-accept (pencere açılır açılmaz kabul)
 - Tercihli auto-pick (örn. shaco, teemo, trundle)
+- Durumun Meşgul/Uzaktayken lobide biri **BASLAT** yazarsa Telegram'dan onay isteği gönderir
 - Hafif, tek Python süreci
 
 ## Kurulum
@@ -55,6 +66,15 @@ Sohbetten gelen komutlarla (BASLAT, DURDUR, DEVRET, BAN, ANONS) **League of Lege
 ### Ortam değişkenleri
 - `AUTO_READY=true|false` (varsayılan: true)
 - `LOG_LEVEL=INFO|DEBUG`
+- `TELEGRAM_BOT_TOKEN=<token>` (isteğe bağlı; Telegram köprüsü için zorunlu)
+- `TELEGRAM_OWNER_ID=<kullanıcı_id>` (BASLAT bildirimlerini alacak Telegram kullanıcı ID’si; @userinfobot ile öğrenebilirsin)
+- `TELEGRAM_FORUM_ID=<kanal_id>` (isteğe bağlı forum/kanal thread’i)
+
+#### Telegram köprüsünü test etme
+1. Bot token ve owner ID’yi ayarla: `set TELEGRAM_BOT_TOKEN=123...`, `set TELEGRAM_OWNER_ID=456...`
+2. `python telegram_self_test.py --requester Kanka` komutuyla League açmadan sahte bir BASLAT isteği gönder.
+3. Telegram’daki onay / red butonlarına bas; terminalde sonucu görürsün.
+4. Bot’a `/start` yazdığında konsolda `Owner doğrulandı: <id>` log’u görünür, yani owner ID başarıyla okundu.
 
 ## Sorumlu kullanım
 Bu proje eğitim/otomasyon amaçlıdır. Hile, taciz, EULA/ToS ihlali için kullanmayın.

@@ -1,6 +1,6 @@
 from __future__ import annotations
 import json, threading, asyncio
-from typing import Optional, Dict
+from typing import Optional, Dict, Callable
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from utils import log_once
@@ -19,6 +19,8 @@ class TelegramBridge:
         self.topics: Dict[str, int] = self._load_topics()
         self.topic_to_friend: Dict[int, str] = {}
         self._rebuild_reverse_index()
+        self._start_callbacks: Dict[str, Callable[[bool], None]] = {}
+        self._owner_confirmed = False
 
     def _rebuild_reverse_index(self):
         topics = getattr(self, "topics", {}) or {}
@@ -44,6 +46,7 @@ class TelegramBridge:
         self.app.add_handler(CommandHandler("start", self._cmd_start))
         self.app.add_handler(CommandHandler(["to", "who", "friends"], self._cmd_router))
         self.app.add_handler(CallbackQueryHandler(self._on_select_friend, pattern=r"^to:"))
+        self.app.add_handler(CallbackQueryHandler(self._on_start_decision, pattern=r"^start:"))
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._on_text))
 
     def start_in_thread(self):
@@ -59,6 +62,10 @@ class TelegramBridge:
 
     async def _only_owner(self, update: Update) -> bool:
         if update.effective_user and update.effective_user.id == self.owner_id:
+            if not self._owner_confirmed:
+                username = update.effective_user.username or "?"
+                log_once("TG", f"Owner doğrulandı: {update.effective_user.id} (@{username})")
+                self._owner_confirmed = True
             return True
         try:
             await update.effective_message.reply_text("Yetkin yok.")
@@ -131,6 +138,34 @@ class TelegramBridge:
         await update.callback_query.answer()
         await update.effective_message.reply_text(f"Hedef: {self.cs.friend_display_name(key)}")
 
+    async def _on_start_decision(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not await self._only_owner(update):
+            return
+        data = update.callback_query.data.split(':')
+        if len(data) != 3:
+            await update.callback_query.answer("Geçersiz veri", show_alert=True)
+            return
+        _, req_id, decision = data
+        cb = self._start_callbacks.pop(req_id, None)
+        if not cb:
+            await update.callback_query.answer("İstek bulunamadı", show_alert=True)
+            return
+        approved = (decision == 'ok')
+        await update.callback_query.answer("Kaydedildi")
+
+        def _fire():
+            try:
+                cb(approved)
+            except Exception as exc:
+                log_once("TG", f"start cb err: {exc}")
+
+        threading.Thread(target=_fire, daemon=True).start()
+        msg = "BASLAT isteği onaylandı" if approved else "BASLAT isteği reddedildi"
+        try:
+            await update.effective_message.reply_text(msg)
+        except Exception:
+            pass
+
     async def _on_text(self, update, context):
         if not await self._only_owner(update): return
         text = update.message.text
@@ -157,3 +192,40 @@ class TelegramBridge:
         if not (self._loop and self.app):
             log_once("TG", "loop not ready; dropping DM"); return
         asyncio.run_coroutine_threadsafe(_send(), self._loop)
+
+    def request_start_confirmation(
+        self,
+        request_id: str,
+        requester: str,
+        availability: str,
+        callback: Callable[[bool], None],
+    ) -> bool:
+        """Telegram üzerinden BASLAT isteği için onay ister."""
+
+        if not (self._loop and self.app):
+            log_once("TG", "loop not ready; BASLAT isteği gönderilemedi")
+            return False
+
+        self._start_callbacks[request_id] = callback
+        avail_txt = availability.upper() if availability else "bilinmiyor"
+
+        async def _send():
+            text = (
+                f"Lobby'de {requester} BASLAT yazdı. Durumun: {avail_txt}. Onaylıyor musun?"
+            )
+            kb = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("✅ Onayla", callback_data=f"start:{request_id}:ok"),
+                    InlineKeyboardButton("❌ Reddet", callback_data=f"start:{request_id}:no"),
+                ]
+            ])
+            await self.app.bot.send_message(chat_id=self.owner_id, text=text, reply_markup=kb)
+
+        fut = asyncio.run_coroutine_threadsafe(_send(), self._loop)
+        try:
+            fut.result(timeout=5)
+            return True
+        except Exception as exc:
+            log_once("TG", f"start request send err: {exc}")
+            self._start_callbacks.pop(request_id, None)
+            return False
