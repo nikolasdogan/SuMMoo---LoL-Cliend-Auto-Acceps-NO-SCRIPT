@@ -530,6 +530,8 @@ def main():
         tb = TelegramBridge(cs, owner_id=OWNER, bot_token=BOT,
                             forum_chat_id=(int(FORUM) if FORUM else None))
         tb.start_in_thread()
+        if not tb.wait_until_ready(10.0):
+            log_once("TG", "Telegram bridge hazır olamadı (10 sn timeout)")
         dm_callbacks.append(tb.on_dm_from_lol)
         log_once("TG", "Telegram bridge aktif (main üzerinden).")
     else:

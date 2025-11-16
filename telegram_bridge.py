@@ -21,6 +21,7 @@ class TelegramBridge:
         self._rebuild_reverse_index()
         self._start_callbacks: Dict[str, Callable[[bool], None]] = {}
         self._owner_confirmed = False
+        self._ready = threading.Event()
 
     def _rebuild_reverse_index(self):
         topics = getattr(self, "topics", {}) or {}
@@ -55,10 +56,17 @@ class TelegramBridge:
             asyncio.set_event_loop(loop)
             self._loop = loop
             self._build()
+            self._ready.set()
             log_once("TG", f"loop ready: {id(loop)}")
             self.app.run_polling(allowed_updates=Update.ALL_TYPES)
+        self._ready.clear()
         threading.Thread(target=_runner, daemon=True).start()
         log_once("TG", "Telegram bridge thread started")
+
+    def wait_until_ready(self, timeout: float = 5.0) -> bool:
+        """Harici çağrıların döngü hazır olana kadar beklemesine izin verir."""
+
+        return self._ready.wait(timeout)
 
     async def _only_owner(self, update: Update) -> bool:
         if update.effective_user and update.effective_user.id == self.owner_id:
@@ -186,6 +194,10 @@ class TelegramBridge:
 
     # ---- LoL → Telegram DM akışı ----
     def on_dm_from_lol(self, friend_key: str, friend_name: str, body: str, is_me: bool):
+        if not self.wait_until_ready(0):
+            log_once("TG", "loop not ready; dropping DM")
+            return
+
         async def _send():
             text = (f"[ME=>YOU] : {body}" if is_me else f"[YOU=>ME] : {body}")
             await self.app.bot.send_message(chat_id=self.owner_id, text=f"[{friend_name}] {text}")
@@ -201,6 +213,10 @@ class TelegramBridge:
         callback: Callable[[bool], None],
     ) -> bool:
         """Telegram üzerinden BASLAT isteği için onay ister."""
+
+        if not self.wait_until_ready(5.0):
+            log_once("TG", "Telegram bridge hazır değil; BASLAT isteği beklemede kaldı")
+            return False
 
         if not (self._loop and self.app):
             log_once("TG", "loop not ready; BASLAT isteği gönderilemedi")

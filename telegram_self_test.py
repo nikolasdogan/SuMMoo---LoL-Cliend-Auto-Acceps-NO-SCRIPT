@@ -70,6 +70,8 @@ def main():
         forum_chat_id=int(forum_id) if forum_id else None,
     )
     bridge.start_in_thread()
+    if not bridge.wait_until_ready(10.0):
+        raise SystemExit("Telegram bot 10 sn içinde hazır hale gelmedi.")
 
     req_id = f"selftest-{uuid.uuid4().hex[:8]}"
     print(f"Telegram'a test BASLAT isteği gönderiliyor (request_id={req_id}).")
