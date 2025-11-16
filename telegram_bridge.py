@@ -20,15 +20,18 @@ class TelegramBridge:
         self.topic_to_friend: Dict[int, str] = {}
         self._rebuild_reverse_index()
         self._start_callbacks: Dict[str, Callable[[bool], None]] = {}
-        # Keep public attribute names (`owner_confirmed`, `ready`) to match
-        # upstream expectations and avoid merge conflicts, but also expose
-        # private aliases via properties for internal helpers.
-        self.owner_confirmed = False
-        self.ready = threading.Event()
 
     def _rebuild_reverse_index(self):
         topics = getattr(self, "topics", {}) or {}
-        self.topic_to_friend = {tid: fk for fk, tid in topics.items() if isinstance(tid, int)}
+        rev = {}
+        for fk, tid in topics.items():
+            # tid may be stored as int or string in JSON; try to coerce to int
+            try:
+                tid_int = int(tid)
+            except Exception:
+                continue
+            rev[tid_int] = fk
+        self.topic_to_friend = rev
 
     def _load_topics(self) -> Dict[str, int]:
         try:
@@ -46,31 +49,12 @@ class TelegramBridge:
             pass
 
     def _build(self):
-        async def _mark_ready(app):
-            self.ready.set()
-            log_once("TG", "Telegram bridge hazır (polling başladı)")
-
-        async def _clear_ready(app):
-            self.ready.clear()
-            log_once("TG", "Telegram bridge durduruldu")
-
-        self.app = (
-            ApplicationBuilder()
-            .token(self.bot_token)
-            .post_init(_mark_ready)
-            .post_shutdown(_clear_ready)
-            .build()
-        )
+        self.app = ApplicationBuilder().token(self.bot_token).build()
         self.app.add_handler(CommandHandler("start", self._cmd_start))
         self.app.add_handler(CommandHandler(["to", "who", "friends"], self._cmd_router))
         self.app.add_handler(CallbackQueryHandler(self._on_select_friend, pattern=r"^to:"))
         self.app.add_handler(CallbackQueryHandler(self._on_start_decision, pattern=r"^start:"))
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._on_text))
-
-    def start(self):
-        """Upstream compatibility shim for older callers expecting .start()."""
-
-        self.start_in_thread()
 
     def start_in_thread(self):
         def _runner():
@@ -80,21 +64,15 @@ class TelegramBridge:
             self._build()
             log_once("TG", f"loop ready: {id(loop)}")
             self.app.run_polling(allowed_updates=Update.ALL_TYPES)
-        self.ready.clear()
         threading.Thread(target=_runner, daemon=True).start()
         log_once("TG", "Telegram bridge thread started")
 
-    def wait_until_ready(self, timeout: float = 5.0) -> bool:
-        """Harici çağrıların döngü hazır olana kadar beklemesine izin verir."""
-
-        return self.ready.wait(timeout)
+    # Upstream callers (örn. main_telegram.py) hâlâ .start() bekliyor olabilir.
+    def start(self):
+        self.start_in_thread()
 
     async def _only_owner(self, update: Update) -> bool:
         if update.effective_user and update.effective_user.id == self.owner_id:
-            if not self.owner_confirmed:
-                username = update.effective_user.username or "?"
-                log_once("TG", f"Owner doğrulandı: {update.effective_user.id} (@{username})")
-                self.owner_confirmed = True
             return True
         try:
             await update.effective_message.reply_text("Yetkin yok.")
@@ -199,7 +177,7 @@ class TelegramBridge:
         if not await self._only_owner(update): return
         text = update.message.text
         chat = update.effective_chat
-        thread_id = update.effective_message.message_thread_id
+        thread_id = getattr(update.effective_message, "message_thread_id", None)
 
         if self.forum_chat_id and chat and chat.id == self.forum_chat_id and thread_id:
             fk = self.topic_to_friend.get(thread_id)
@@ -215,10 +193,6 @@ class TelegramBridge:
 
     # ---- LoL → Telegram DM akışı ----
     def on_dm_from_lol(self, friend_key: str, friend_name: str, body: str, is_me: bool):
-        if not self.wait_until_ready(0):
-            log_once("TG", "loop not ready; dropping DM")
-            return
-
         async def _send():
             text = (f"[ME=>YOU] : {body}" if is_me else f"[YOU=>ME] : {body}")
             await self.app.bot.send_message(chat_id=self.owner_id, text=f"[{friend_name}] {text}")
@@ -234,10 +208,6 @@ class TelegramBridge:
         callback: Callable[[bool], None],
     ) -> bool:
         """Telegram üzerinden BASLAT isteği için onay ister."""
-
-        if not self.wait_until_ready(5.0):
-            log_once("TG", "Telegram bridge hazır değil; BASLAT isteği beklemede kaldı")
-            return False
 
         if not (self._loop and self.app):
             log_once("TG", "loop not ready; BASLAT isteği gönderilemedi")
