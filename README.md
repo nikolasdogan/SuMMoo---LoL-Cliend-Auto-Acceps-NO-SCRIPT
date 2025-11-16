@@ -30,6 +30,9 @@ An open-source utility that allows you to remotely manage the **League of Legend
 ### Environment variables
 - `AUTO_READY=true|false` (default: true)
 - `LOG_LEVEL=INFO|DEBUG`
+- `TELEGRAM_BOT_TOKEN=<token>` (optional, required for Telegram bridge)
+- `TELEGRAM_OWNER_ID=<chat_id>` (Telegram user ID to receive requests; DM @userinfobot to learn yours)
+- `TELEGRAM_FORUM_ID=<threaded_chat_id>` (optional forum/channel thread relay)
 
 ## Responsible use
 This project is for educational/automation purposes. Do not use it for cheating, harassment, or EULA/ToS violations.
@@ -57,6 +60,9 @@ Sohbetten gelen komutlarla (BASLAT, DURDUR, DEVRET, BAN, ANONS) **League of Lege
 ### Ortam değişkenleri
 - `AUTO_READY=true|false` (varsayılan: true)
 - `LOG_LEVEL=INFO|DEBUG`
+- `TELEGRAM_BOT_TOKEN=<token>` (isteğe bağlı; Telegram köprüsü için zorunlu)
+- `TELEGRAM_OWNER_ID=<kullanıcı_id>` (BASLAT bildirimlerini alacak Telegram kullanıcı ID’si; @userinfobot ile öğrenebilirsin)
+- `TELEGRAM_FORUM_ID=<kanal_id>` (isteğe bağlı forum/kanal thread’i)
 
 ## Sorumlu kullanım
 Bu proje eğitim/otomasyon amaçlıdır. Hile, taciz, EULA/ToS ihlali için kullanmayın.
