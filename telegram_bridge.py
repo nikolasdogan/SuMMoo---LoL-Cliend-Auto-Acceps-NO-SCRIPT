@@ -43,7 +43,21 @@ class TelegramBridge:
             pass
 
     def _build(self):
-        self.app = ApplicationBuilder().token(self.bot_token).build()
+        async def _mark_ready(app):
+            self._ready.set()
+            log_once("TG", "Telegram bridge hazır (polling başladı)")
+
+        async def _clear_ready(app):
+            self._ready.clear()
+            log_once("TG", "Telegram bridge durduruldu")
+
+        self.app = (
+            ApplicationBuilder()
+            .token(self.bot_token)
+            .post_init(_mark_ready)
+            .post_shutdown(_clear_ready)
+            .build()
+        )
         self.app.add_handler(CommandHandler("start", self._cmd_start))
         self.app.add_handler(CommandHandler(["to", "who", "friends"], self._cmd_router))
         self.app.add_handler(CallbackQueryHandler(self._on_select_friend, pattern=r"^to:"))
@@ -56,7 +70,6 @@ class TelegramBridge:
             asyncio.set_event_loop(loop)
             self._loop = loop
             self._build()
-            self._ready.set()
             log_once("TG", f"loop ready: {id(loop)}")
             self.app.run_polling(allowed_updates=Update.ALL_TYPES)
         self._ready.clear()
