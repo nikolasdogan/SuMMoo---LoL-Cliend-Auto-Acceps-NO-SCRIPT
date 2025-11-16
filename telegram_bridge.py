@@ -67,6 +67,11 @@ class TelegramBridge:
         self.app.add_handler(CallbackQueryHandler(self._on_start_decision, pattern=r"^start:"))
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._on_text))
 
+    def start(self):
+        """Upstream compatibility shim for older callers expecting .start()."""
+
+        self.start_in_thread()
+
     def start_in_thread(self):
         def _runner():
             loop = asyncio.new_event_loop()
