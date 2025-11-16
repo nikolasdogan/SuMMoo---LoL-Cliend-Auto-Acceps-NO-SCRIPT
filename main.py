@@ -1,9 +1,20 @@
 from __future__ import annotations
-import sys, threading, time, os
+import sys, threading, time, os, importlib.util
 from typing import Optional, Callable
 from utils import log_once, ASCII_LOGO
 from lcu_session import LcuSession
 from chat_service import ChatService
+def _ensure_dependency(module: str, package_hint: str = "") -> None:
+    if importlib.util.find_spec(module) is None:
+        hint = f" (örn. {package_hint})" if package_hint else ""
+        sys.stderr.write(
+            f"Gerekli '{module}' modülü bulunamadı{hint}.\n"
+            "Lütfen 'pip install -r requirements.txt' komutunu çalıştırın veya modülü manuel olarak yükleyin.\n"
+        )
+        sys.exit(1)
+
+
+_ensure_dependency("pynput", "pip install pynput")
 from pynput import keyboard
 from telegram_bridge import TelegramBridge
 
