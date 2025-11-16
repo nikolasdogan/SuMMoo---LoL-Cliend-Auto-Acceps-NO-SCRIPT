@@ -283,7 +283,7 @@ class ChatService:
     # chat_service.py  →  ChatService sınıfına koy
     def watch_group_messages(self, on_message, interval: float = 1.0, include_self: bool = True, debug: bool = True):
         """
-        Grup sohbetlerini izler ve her yeni mesaj için on_message(conv_id, body, from_name) çağırır.
+        Grup sohbetlerini izler ve her yeni mesaj için on_message(conv_id, body, from_name, from_sid) çağırır.
         - include_self=True: SOLO lobide kendi yazdıklarını da yakalar.
         - debug=True: Yakalanan HER mesajı terminale loglar (GRP-SEE).
         """
@@ -306,11 +306,11 @@ class ChatService:
 
         def _sender(msg: dict) -> str:
             return (
-                    msg.get("fromSummonerName")
-                    or msg.get("fromName")
-                    or msg.get("senderName")
-                    or msg.get("sender")
-                    or "Unknown"
+                msg.get("fromSummonerName")
+                or msg.get("fromName")
+                or msg.get("senderName")
+                or msg.get("sender")
+                or "Unknown"
             )
 
         while True:
@@ -356,7 +356,12 @@ class ChatService:
 
                         # callback (komut işleyici)
                         try:
-                            on_message(cid, body, sender)
+                            on_message(
+                                cid,
+                                body,
+                                sender,
+                                str(m.get('fromSummonerId') or '').strip() or None,
+                            )
                         except Exception as cb_err:
                             log_once("GRP", f"on_message err: {cb_err}")
 
@@ -378,11 +383,24 @@ class ChatService:
             if (m.get("summonerName") or "")
         }
 
+    def _lobby_member_ids(self) -> set[str]:
+        ids = set()
+        for m in self._lobby_members():
+            sid = str(m.get("summonerId") or "").strip()
+            if sid:
+                ids.add(sid)
+        return ids
+
     def is_in_lobby(self, summoner_name: str | None) -> bool:
         """Return True if the given summoner currently sits in our lobby."""
         if not summoner_name:
             return False
         return summoner_name.strip().lower() in self._lobby_member_names()
+
+    def is_in_lobby_id(self, summoner_id: str | None) -> bool:
+        if not summoner_id:
+            return False
+        return summoner_id.strip() in self._lobby_member_ids()
 
     def get_lobby_group_id(self) -> Optional[str]:
         """

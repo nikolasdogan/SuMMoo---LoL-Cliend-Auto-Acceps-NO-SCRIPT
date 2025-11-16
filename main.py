@@ -49,7 +49,7 @@ def emergency_hotkey(stop_flag: dict):
         L.join()
 
 # ------------ Grup komutları (Lobby sohbeti) ------------
-def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: str, cfg: dict):
+def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: str, from_sid: Optional[str], cfg: dict):
     txt = (body or "").strip()
     low = txt.lower()
 
@@ -58,7 +58,7 @@ def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: st
             cs.send(conv_id, msg)
 
     def require_lobby_member(action: str) -> bool:
-        if cs.is_in_lobby(from_name):
+        if cs.is_in_lobby_id(from_sid) or cs.is_in_lobby(from_name):
             return True
         actor = from_name or "(bilinmeyen)"
         warning = f"{actor} lobide olmadığı için {action} komutu yok sayıldı."
@@ -375,7 +375,7 @@ def main():
     # Lobby grup mesajlarını izle → komutları işle
     threading.Thread(
         target=cs.watch_group_messages,
-        args=(lambda cid, body, frm: handle_group_command(cs, cid, body, frm, cfg), 1.5),
+        args=(lambda cid, body, frm, sid: handle_group_command(cs, cid, body, frm, sid, cfg), 1.5),
         daemon=True
     ).start()
 
@@ -383,7 +383,7 @@ def main():
     # Lobby grup mesajlarını izle → komutları işle
     threading.Thread(
         target=lambda: cs.watch_group_messages(
-            lambda cid, body, frm: handle_group_command(cs, cid, body, frm, cfg),
+            lambda cid, body, frm, sid: handle_group_command(cs, cid, body, frm, sid, cfg),
             0.8,  # interval
             True,  # include_self → SOLO desteği
             True  # debug → her mesajı GRP-SEE olarak yaz
