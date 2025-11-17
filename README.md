@@ -81,12 +81,11 @@ Bu proje eğitim/otomasyon amaçlıdır. Hile, taciz, EULA/ToS ihlali için kull
 Tüm riskler kullanıcıya aittir; Riot’un şartlarını kontrol edin.
 
 ##Planlanan Gelistirmeler
-* Telegram uzerinden Kabul Et / Reddet
-* Disarida durumda iken gelen baslat istegi devret istegi telegramdan onay bildirimi
-* Telegram oto kod ile kolay eslestirme ve QR ile esletirme sistemi
-* oto pich ve ban
-* zaman duyarli oyun durumlari ve oyun kabul sistemleri sadece arkadaslar veya kisinin belirledigi kural sistemi
-
-* Arayuz tasarimi ve gelistirilmesi
-* <img width="1505" height="738" alt="image" src="https://github.com/user-attachments/assets/afd7df78-534b-48fc-9932-398b004f0870" />
+- Telegram uzerinden Kabul Et / Reddet
+- Disarida durumda iken gelen baslat istegi devret istegi telegramdan onay bildirimi
+- Telegram oto kod ile kolay eslestirme ve QR ile esletirme sistemi
+- oto pich ve ban
+- zaman duyarli oyun durumlari ve oyun kabul sistemleri sadece arkadaslar veya kisinin belirledigi kural sistemi
+- Arayuz tasarimi ve gelistirilmesi
+ <img width="75%" height="75%" alt="image" src="https://github.com/user-attachments/assets/afd7df78-534b-48fc-9932-398b004f0870" />
 
