@@ -1,4 +1,10 @@
-<img width="75%" height="75%" alt="image" src="https://github.com/user-attachments/assets/a8e503a2-4db0-4e42-bffe-f3777bac81ce" />
+# New API Server Terminal Screen
+<img width="75%" height="75%" alt="image" src="https://github.com/user-attachments/assets/681ee005-0c0a-4a33-bb3b-a9527bae4da3" />
+
+# Test Web UI Screen
+
+<img width="75%" height="75%" alt="image" src="https://github.com/user-attachments/assets/b1b3124c-282d-4b7d-9e5d-854959be0629" />
+
 
 ## Downloads
 <img width="25%" height="25%" alt="download_image" src="https://github.com/user-attachments/assets/90da2796-f589-4e30-ada1-73b3507791c5" />
