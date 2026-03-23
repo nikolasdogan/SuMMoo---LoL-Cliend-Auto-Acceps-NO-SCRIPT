@@ -16,13 +16,13 @@ def log_once(tag: str, text: str) -> None:
 
 def parse_ts_iso(ts: str | None) -> float:
     if not ts:
-        return time.time()
+        return 0.0
     try:
         if ts.endswith("Z"):
             ts = ts[:-1] + "+00:00"
         return datetime.fromisoformat(ts).timestamp()
     except Exception:
-        return time.time()
+        return 0.0
 
 def status_tag(avail: str | None) -> str:
     a = (avail or "").lower()
