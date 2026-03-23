@@ -196,8 +196,8 @@ def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: st
         info_to_group(f"GeoInfo: {info}")
         return
 
-        # --- AUTO-PICK (sadece lobi sohbetinden kontrol) ---
-        # PICKLIST Shaco,Teemo,Trundle
+    # --- AUTO-PICK (sadece lobi sohbetinden kontrol) ---
+    # PICKLIST Shaco,Teemo,Trundle
     if low.startswith("picklist "):
         names_str = txt.split(" ", 1)[1].strip()
         names = [s.strip() for s in names_str.split(",") if s.strip()]
@@ -221,7 +221,7 @@ def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: st
         info_to_group(msg)
         return
 
-        # PICK ON / PICK OFF  → otomatik seçim aç/kapat
+    # PICK ON / PICK OFF  → otomatik seçim aç/kapat
     if low in ("pick on", "pick aç", "pick ac"):
         cfg["auto_pick_enabled"] = True
         log_once("PICK", "auto-pick = ON")
@@ -233,7 +233,7 @@ def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: st
         info_to_group("Auto-pick: OFF")
         return
 
-        # LOCK ON / LOCK OFF  → pick sonrası lock davranışı
+    # LOCK ON / LOCK OFF  → pick sonrası lock davranışı
     if low in ("lock on", "kilit on", "kilit aç", "kilit ac"):
         cfg["auto_pick_lock"] = True
         log_once("PICK", "auto-pick-lock = ON")
