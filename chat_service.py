@@ -419,36 +419,6 @@ class ChatService:
             if (m.get("summonerName") or "")
         }
 
-    def get_lobby_group_id(self) -> Optional[str]:
-        """
-        Lobby üyeleri ile mevcut grup sohbetlerinin katılımcılarını kesiştirir,
-        en çok eşleşen grubu döner. Solo iken de (tek eşleşme) id dönebilir.
-        """
-        try:
-            lobby = self._lobby_member_names()
-            if not lobby:
-                return None
-
-            best_gid, best_score = None, 0
-            for g in self.list_groups():
-                gid = g.get("id")
-                if not gid:
-                    continue
-                in_group = {
-                    (p.get('name') or p.get('gameName') or p.get('summonerName') or '').lower()
-                    for p in self.participants(gid)
-                }
-                score = len(in_group & lobby)
-                if score > best_score:
-                    best_score, best_gid = score, gid
-
-            # Eşik: solo/duo'da >=1, daha kalabalıkta >=2 denk üye varsa uygun kabul et
-            if best_gid and (best_score >= (1 if len(lobby) <= 2 else 2)):
-                return best_gid
-            return None
-        except Exception:
-            return None
-
     def follow_lobby_chat(self) -> bool:
         gid = self.get_lobby_group_id()
         if gid and gid != self.active_group_id:
@@ -460,50 +430,6 @@ class ChatService:
         if not self.active_group_id:
             self.follow_lobby_chat()
         return self.active_group_id and self.send(self.active_group_id, text)
-
-    def ready_check_accept_verbose(self) -> tuple[bool, int, str]:
-        """
-        Ready-check accept için dayanıklı denemeler.
-        Dönen: (ok, status_code, text)
-        """
-        s, base = self.lcu.get()
-        if not s or not base:
-            return (False, -1, "no session")
-
-        url = f"{base}/lol-matchmaking/v1/ready-check/accept"
-        tries = [
-            lambda: s.post(url, json={}, timeout=3),
-            lambda: s.post(url, data=b"{}", timeout=3),
-            lambda: s.post(url, timeout=3),
-            lambda: s.put(url, json={}, timeout=3),   # bazı build'lerde PUT kabul ediliyor
-        ]
-        last = None
-        for call in tries:
-            try:
-                r = call()
-                last = r
-                if r.status_code in (200, 204):
-                    return (True, r.status_code, r.text or "")
-            except Exception as e:
-                last = None
-                err = str(e)
-                # sıradaki varyanta geç
-                continue
-
-        if last is None:
-            return (False, -1, "exception")
-        return (False, getattr(last, "status_code", 0) or 0, getattr(last, "text", "") or "")
-
-    # (isteğe bağlı ama kullanışlı) mevcut kısa yöntemi verbose'a yönlendir
-    def ready_check_accept(self) -> bool:
-        ok, _, _ = self.ready_check_accept_verbose()
-        return ok
-
-
-    # (isteğe bağlı ama kullanışlı) mevcut kısa yöntemi verbose'a yönlendir
-    def ready_check_accept(self) -> bool:
-        ok, _, _ = self.ready_check_accept_verbose()
-        return ok
 
     def ready_check_accept_verbose(self) -> tuple[bool, int, str]:
         """
@@ -564,10 +490,6 @@ class ChatService:
             except Exception:
                 return {}
         return {}
-
-    def ready_check_accept(self) -> bool:
-        r = self._post("/lol-matchmaking/v1/ready-check/accept")
-        return bool(r and r.status_code in (200, 204))
 
     def ready_check_decline(self) -> bool:
         r = self._post("/lol-matchmaking/v1/ready-check/decline")
