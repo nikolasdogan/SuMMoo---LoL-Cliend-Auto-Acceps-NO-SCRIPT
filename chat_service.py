@@ -1,4 +1,5 @@
 from __future__ import annotations
+import threading
 from typing import Optional, Dict, List, Callable
 from urllib.parse import quote
 from utils import log_once, parse_ts_iso, status_tag
@@ -11,6 +12,8 @@ class ChatService:
         self.ME: Dict = {}
         self._last_dm_ts: Dict[str, float] = {}
         self.active_group_id: Optional[str] = None  # aktif takip edilen grup (lobby chat vs.)
+        # Serializes LCU-mutating commands (matchmaking, kick, promote) across threads.
+        self._lcu_cmd_lock = threading.Lock()
 
     # ---- raw helpers ----
     def _get(self, path: str, timeout: int = 3):
@@ -267,13 +270,17 @@ class ChatService:
             return False
 
     def start_matchmaking(self) -> bool:
-        r = self._post("/lol-lobby/v2/lobby/matchmaking/search");  return bool(r)
+        with self._lcu_cmd_lock:
+            r = self._post("/lol-lobby/v2/lobby/matchmaking/search")
+            return bool(r)
 
     def stop_matchmaking(self) -> bool:
-        s, base = self.lcu.get()
-        if not s: return False
-        r = s.delete(f"{base}/lol-lobby/v2/lobby/matchmaking/search", timeout=3)
-        return r.status_code in (200,204)
+        with self._lcu_cmd_lock:
+            s, base = self.lcu.get()
+            if not s:
+                return False
+            r = s.delete(f"{base}/lol-lobby/v2/lobby/matchmaking/search", timeout=3)
+            return r.status_code in (200, 204)
 
     def _lobby_members(self) -> list[dict]:
         j = self._lget("/lol-lobby/v2/lobby")
@@ -296,14 +303,17 @@ class ChatService:
         return None
 
     def kick_member_by_id(self, summoner_id: int) -> bool:
-        s, base = self.lcu.get()
-        if not s: return False
-        r = s.delete(f"{base}/lol-lobby/v2/lobby/members/{summoner_id}", timeout=3)
-        return r.status_code in (200,204)
+        with self._lcu_cmd_lock:
+            s, base = self.lcu.get()
+            if not s:
+                return False
+            r = s.delete(f"{base}/lol-lobby/v2/lobby/members/{summoner_id}", timeout=3)
+            return r.status_code in (200, 204)
 
     def promote_member_by_id(self, summoner_id: int) -> bool:
-        r = self._post(f"/lol-lobby/v2/lobby/members/{summoner_id}/promote")
-        return bool(r)
+        with self._lcu_cmd_lock:
+            r = self._post(f"/lol-lobby/v2/lobby/members/{summoner_id}/promote")
+            return bool(r)
 
     # ---- Group helpers ----
     def select_group(self, key: str) -> Optional[dict]:
