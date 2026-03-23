@@ -20,6 +20,7 @@ class TelegramBridge:
         self.topic_to_friend: Dict[int, str] = {}
         self._rebuild_reverse_index()
         self._start_callbacks: Dict[str, Callable[[bool], None]] = {}
+        self._start_callbacks_lock = threading.Lock()
         self._ready_event = threading.Event()
 
     def _rebuild_reverse_index(self):
@@ -163,7 +164,8 @@ class TelegramBridge:
             await update.callback_query.answer("Geçersiz veri", show_alert=True)
             return
         _, req_id, decision = data
-        cb = self._start_callbacks.pop(req_id, None)
+        with self._start_callbacks_lock:
+            cb = self._start_callbacks.pop(req_id, None)
         if not cb:
             await update.callback_query.answer("İstek bulunamadı", show_alert=True)
             return
@@ -223,7 +225,8 @@ class TelegramBridge:
             log_once("TG", "loop not ready; BASLAT isteği gönderilemedi")
             return False
 
-        self._start_callbacks[request_id] = callback
+        with self._start_callbacks_lock:
+            self._start_callbacks[request_id] = callback
         avail_txt = availability.upper() if availability else "bilinmiyor"
 
         async def _send():
@@ -244,5 +247,6 @@ class TelegramBridge:
             return True
         except Exception as exc:
             log_once("TG", f"start request send err: {exc}")
-            self._start_callbacks.pop(request_id, None)
+            with self._start_callbacks_lock:
+                self._start_callbacks.pop(request_id, None)
             return False
