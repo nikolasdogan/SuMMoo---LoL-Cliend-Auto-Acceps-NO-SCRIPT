@@ -70,6 +70,7 @@ def handle_party_management_command(
     sender_puuid: Optional[str] = None,
     conv_id: Optional[str] = None,
     start_request_handler: Optional[Callable[[Optional[str], str, Callable[[str], None]], bool]] = None,
+    cfg: Optional[dict] = None,
 ) -> bool:
     text = (txt or "").strip()
     if not text:
@@ -87,6 +88,15 @@ def handle_party_management_command(
             reply("lobbye katilmadiginiz icin oyun baslatma yetkini bulunmamaktadir")
             return True
         if cs.is_party_leader():
+            # Dedup guard: ignore duplicate BASLAT triggers within 2 seconds.
+            # Protects against concurrent lobby-chat + DM paths firing start_matchmaking twice.
+            if cfg is not None:
+                now = time.time()
+                last = cfg.get("_baslat_last_ts", 0.0)
+                if now - last < 2.0:
+                    log_once("QUEUE", f"START_DEDUP: suppressed duplicate from {from_name}")
+                    return True
+                cfg["_baslat_last_ts"] = now
             if start_request_handler and start_request_handler(conv_id, from_name, reply):
                 return True
             reply("Matchmaking başlatılıyor…")
@@ -139,7 +149,7 @@ def handle_party_management_command(
     return False
 
 
-def handle_dm_party_command(cs: ChatService, friend_key: str, friend_name: str, body: str) -> bool:
+def handle_dm_party_command(cs: ChatService, friend_key: str, friend_name: str, body: str, cfg: Optional[dict] = None) -> bool:
     name = friend_name or friend_key or "?"
 
     def dm_feedback(msg: str):
@@ -155,6 +165,7 @@ def handle_dm_party_command(cs: ChatService, friend_key: str, friend_name: str, 
         sender_puuid=friend_key,
         conv_id=None,
         start_request_handler=None,
+        cfg=cfg,
     )
 
 
@@ -175,6 +186,7 @@ def handle_group_command(cs: ChatService, conv_id: str, body: str, from_name: st
         info_to_group,
         conv_id=conv_id,
         start_request_handler=start_request_handler,
+        cfg=cfg,
     ):
         return
 
@@ -515,7 +527,7 @@ def main():
     def _dm_command_callback(friend_key: str, friend_name: str, body: str, is_me: bool):
         if is_me:
             return
-        if handle_dm_party_command(cs, friend_key, friend_name, body):
+        if handle_dm_party_command(cs, friend_key, friend_name, body, cfg=cfg):
             who = friend_name or friend_key
             log_once("DM-CMD", f"{who} → {body}")
 
