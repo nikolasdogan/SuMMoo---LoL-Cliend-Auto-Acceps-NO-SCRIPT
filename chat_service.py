@@ -25,6 +25,12 @@ class ChatService:
             return None
         return s.post(f"{base}{path}", json=json, timeout=timeout)
 
+    def _patch(self, path: str, json=None, timeout: int = 3):
+        s, base = self.lcu.get()
+        if not s:
+            return None
+        return s.patch(f"{base}{path}", json=json, timeout=timeout)
+
     # ---- identity ----
     def refresh_me(self):
         r = self._get("/lol-summoner/v1/current-summoner")
