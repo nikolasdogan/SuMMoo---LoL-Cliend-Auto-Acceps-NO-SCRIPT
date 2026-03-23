@@ -20,6 +20,7 @@ class TelegramBridge:
         self.topic_to_friend: Dict[int, str] = {}
         self._rebuild_reverse_index()
         self._start_callbacks: Dict[str, Callable[[bool], None]] = {}
+        self._ready_event = threading.Event()
 
     def _rebuild_reverse_index(self):
         topics = getattr(self, "topics", {}) or {}
@@ -62,6 +63,7 @@ class TelegramBridge:
             asyncio.set_event_loop(loop)
             self._loop = loop
             self._build()
+            self._ready_event.set()
             log_once("TG", f"loop ready: {id(loop)}")
             self.app.run_polling(allowed_updates=Update.ALL_TYPES)
         threading.Thread(target=_runner, daemon=True).start()
@@ -70,6 +72,14 @@ class TelegramBridge:
     # Upstream callers (örn. main_telegram.py) hâlâ .start() bekliyor olabilir.
     def start(self):
         self.start_in_thread()
+
+    def wait_until_ready(self, timeout: float = 10.0) -> bool:
+        """Block until the bot loop and app are initialised, or timeout expires.
+
+        Returns True if ready within *timeout* seconds, False otherwise.
+        Safe to call from any thread immediately after start() / start_in_thread().
+        """
+        return self._ready_event.wait(timeout)
 
     async def _only_owner(self, update: Update) -> bool:
         if update.effective_user and update.effective_user.id == self.owner_id:
